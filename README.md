@@ -58,7 +58,7 @@ Returns `Ok(())` for successful operations or `Err(ProgramError)` if invalid.
 - Low compute unit (CU) consumption
 - Can be stored in account state
 
-## Contributing
+## 🙌 Contributing
 
 Contributions are welcome! Please open issues or PRs on the GitHub repo.
 
