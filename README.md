@@ -3,13 +3,15 @@
 ![license](https://img.shields.io/badge/license-MIT-blue.svg?style=flat)
 [![crates.io](https://img.shields.io/crates/v/brine-tree.svg?style=flat)](https://crates.io/crates/brine-tree)
 
-A fast, low-overhead, Merkle tree library for the Solana SVM programs.
+A fast, low-overhead, Merkle tree library for the Solana programs.
+
+![image](https://github.com/user-attachments/assets/6c34a34b-644f-4248-bf78-d7c43d1e18f6)
+
 
 ---
 
 ## ✨ Features
 
-- Constructs and verifies Merkle trees **within the program**, at run-time
 - Supports insertion, removal, and replacement of leaves
 - Validates inclusion proofs efficiently
 - Zero-copy compatibility with `bytemuck` for fast serialization
@@ -18,8 +20,8 @@ A fast, low-overhead, Merkle tree library for the Solana SVM programs.
 
 ## 🧱 Use Cases
 
-- Whitelist or access control verification
 - State compression for large datasets
+- Whitelist or access control verification
 - Off-chain data integrity checks
 - Cross-chain state proofs
 - Decentralized identity claims
@@ -46,16 +48,15 @@ Returns `Ok(())` for successful operations or `Err(ProgramError)` if invalid.
 ### But why?
 
 **Q: Why not use an off-chain Merkle tree?**  
-**A:** Solana programs often need to verify inclusion or manage state on-chain efficiently. Off-chain Merkle trees require additional infrastructure and trust assumptions. This crate, brine-tree, provides:
+**A:** Solana programs often need to verify inclusion or manage state on-chain efficiently. Off-chain Merkle trees require additional infrastructure and trust assumptions. 
 
-- On-chain Merkle tree construction and verification
+**Q: Why not use something else?**  
+**A:** There definitely are a few [other](https://github.com/anza-xyz/agave/blob/master/merkle-tree/src/merkle_tree.rs) implementations worth looking into, like [concurrent merkle tree](https://github.com/solana-labs/solana-program-library/blob/master/libraries/concurrent-merkle-tree/src/concurrent_merkle_tree.rs), but this one is simple and easy to work with. This crate, brine-tree, provides:
+
+- Simple, on-chain Merkle tree construction and verification
 - Support for dynamic updates (insert, remove, replace)
 - Low compute unit (CU) consumption
-- Seamless integration with Solana programs
-
-## Security
-
-This library has been audited by `Ottersec` twice as part of two seperate programs. This version was pulled from the `code-vm`, which was written and maintained by the same author as this crate.
+- Can be stored in account state
 
 ## Contributing
 
