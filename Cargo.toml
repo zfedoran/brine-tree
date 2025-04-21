@@ -1,6 +1,6 @@
 [package]
 name = "brine-tree"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "Merkle tree implementation for Solana SVM programs"
 license = "MIT"
@@ -16,6 +16,7 @@ crate-type = ["cdylib", "lib"]
 bytemuck = { version = "1.18.0", features = ["derive"] }
 sha2 = "0.10.8"
 bs58 = "0.5.1"
+solana-program = "2.2.1"
 
 [features]
 default = ["std"]
