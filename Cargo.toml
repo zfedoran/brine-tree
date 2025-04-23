@@ -1,23 +1,22 @@
 [package]
 name = "brine-tree"
-version = "0.2.1"
+version = "0.3.0"
 edition = "2021"
-description = "Merkle tree implementation for Solana SVM programs"
+description = "Merkle tree implementation for Solana programs"
 license = "MIT"
 repository = "https://github.com/zfedoran/brine-tree"
 readme = "README.md"
-keywords = ["solana", "merkle-tree", "no_std", "cryptography"]
-categories = ["cryptography", "no-std", "wasm", "embedded"]
+keywords = ["solana", "merkle-tree", "crypto"]
 
 [lib]
 crate-type = ["cdylib", "lib"]
 
 [dependencies]
+sha3 = "0.10.8"
 bytemuck = { version = "1.18.0", features = ["derive"] }
-sha2 = "0.10.8"
-bs58 = "0.5.1"
-solana-program = ">=1.18.0"
+solana-program = { version = ">=1.18.0", optional = true }
 
 [features]
 default = ["std"]
 std = []
+solana = ["solana-program"]

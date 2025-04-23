@@ -1,9 +1,9 @@
 #![allow(unexpected_cfgs)] 
 
 use bytemuck::{Pod, Zeroable};
-use super::hash::Hash;
-use super::{utils, utils::check_condition};
-use super::error::{ProgramError, ProgramResult};
+use super::{hash::Hash, hash, hashv};
+use super::utils::check_condition;
+use super::error::{BrineTreeError, ProgramResult};
 
 #[repr(C, align(8))]
 #[derive(Clone, Copy, PartialEq, Debug,)]
@@ -54,11 +54,11 @@ impl<const N: usize> MerkleTree<N> {
 
     fn calc_zeros(seeds: &[&[u8]]) -> [Hash; N] {
         let mut zeros: [Hash; N] = [Hash::default(); N];
-        let mut current = utils::hashv(seeds);
+        let mut current = hashv(seeds);
 
         for i in 0..N {
             zeros[i] = current;
-            current = utils::hashv(&[current.as_ref(), current.as_ref()]);
+            current = hashv(&[current.as_ref(), current.as_ref()]);
         }
 
         zeros
@@ -67,7 +67,7 @@ impl<const N: usize> MerkleTree<N> {
     pub fn try_insert(&mut self, val: Hash) -> ProgramResult {
         check_condition(
             self.next_index < (1u64 << N),
-            "merkle tree is full",
+            BrineTreeError::TreeFull,
         )?;
 
         let mut current_index = self.next_index;
@@ -118,7 +118,7 @@ impl<const N: usize> MerkleTree<N> {
 
         check_condition(
             MerkleTree::<N>::is_valid_path(&original_path, self.root),
-            "invalid proof for original leaf",
+            BrineTreeError::InvalidProof,
         )?;
 
         for i in 0..N {
@@ -151,7 +151,7 @@ impl<const N: usize> MerkleTree<N> {
     }
 
     pub fn as_leaf(val: Hash) -> Hash {
-        utils::hash(val.as_ref())
+        hash(val.as_ref())
     }
 
     pub fn hash_left_right(left: Hash, right: Hash) -> Hash {
@@ -162,7 +162,7 @@ impl<const N: usize> MerkleTree<N> {
             combined = [right.as_ref(), left.as_ref()];
         }
 
-        utils::hashv(&combined)
+        hashv(&combined)
     }
 
     pub fn compute_path(proof: &[Hash], leaf: Hash) -> Vec<Hash> {
@@ -247,10 +247,10 @@ impl<const N: usize> MerkleTree<N> {
         proof
     }
 
-    fn check_length(&self, proof: &[Hash]) -> Result<(), ProgramError> {
+    fn check_length(&self, proof: &[Hash]) -> Result<(), BrineTreeError> {
         check_condition(
             proof.len() == N,
-            "merkle proof length does not match tree depth",
+            BrineTreeError::ProofLength,
         )
     }
 }
@@ -277,10 +277,10 @@ mod tests {
         let mut tree = TestTree::new(seeds);
         let empty = tree.zero_values.first().unwrap().clone();
 
-        let val1 = utils::hash(b"val_1");
-        let val2 = utils::hash(b"val_2");
-        let val3 = utils::hash(b"val_3");
-        let val4 = utils::hash(b"val_4");
+        let val1 = hash(b"val_1");
+        let val2 = hash(b"val_2");
+        let val3 = hash(b"val_3");
+        let val4 = hash(b"val_4");
 
         // Tree structure:
         // 
@@ -380,9 +380,9 @@ mod tests {
 
         let mut tree = TestTree::new(seeds);
 
-        let val1 = utils::hash(b"val_1");
-        let val2 = utils::hash(b"val_2");
-        let val3 = utils::hash(b"val_3");
+        let val1 = hash(b"val_1");
+        let val2 = hash(b"val_2");
+        let val3 = hash(b"val_3");
 
         let leaves = [
             TestTree::as_leaf(val1), 

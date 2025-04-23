@@ -6,4 +6,4 @@ pub mod utils;
 pub mod tree;
 
 pub use tree::MerkleTree;
-pub use hash::Hash;
+pub use hash::{Hash, hash, hashv};

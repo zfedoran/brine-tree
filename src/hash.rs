@@ -1,5 +1,8 @@
 use bytemuck::{Pod, Zeroable};
 
+#[cfg(not(feature = "solana"))]
+use sha3::Digest;
+
 pub const HASH_BYTES: usize = 32;
 
 #[repr(C)]
@@ -40,4 +43,36 @@ impl Hash {
     pub fn to_bytes(self) -> [u8; HASH_BYTES] {
         self.value
     }
+}
+
+#[cfg(feature = "solana")]
+#[inline(always)]
+pub fn hashv(data: &[&[u8]]) -> Hash {
+    let res = solana_program::keccak::hashv(data);
+    Hash::new_from_array(res.to_bytes())
+}
+
+#[cfg(not(feature = "solana"))]
+#[inline(always)]
+pub fn hashv(data: &[&[u8]]) -> Hash {
+    let mut hasher = sha3::Keccak256::new();
+    for d in data {
+        hasher.update(d);
+    }
+    Hash::new_from_array(hasher.finalize().into())
+}
+
+#[cfg(feature = "solana")]
+#[inline(always)]
+pub fn hash(data: &[u8]) -> Hash {
+    let res = solana_program::keccak::hash(data);
+    Hash::new_from_array(res.to_bytes())
+}
+
+#[cfg(not(feature = "solana"))]
+#[inline(always)]
+pub fn hash(data: &[u8]) -> Hash {
+    let mut hasher = sha3::Keccak256::new();
+    hasher.update(data);
+    Hash::new_from_array(hasher.finalize().into())
 }

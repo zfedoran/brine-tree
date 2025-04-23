@@ -1,7 +1,9 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ProgramError {
+pub enum BrineTreeError {
     InvalidArgument,
-    Custom(&'static str),
+    TreeFull,
+    InvalidProof,
+    ProofLength,
 }
 
-pub type ProgramResult = Result<(), ProgramError>;
+pub type ProgramResult = Result<(), BrineTreeError>;

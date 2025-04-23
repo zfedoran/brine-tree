@@ -161,11 +161,10 @@ dependencies = [
 
 [[package]]
 name = "brine-tree"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
- "bs58",
  "bytemuck",
- "sha2 0.10.8",
+ "sha3",
  "solana-program",
 ]
 
