@@ -244,14 +244,27 @@ fn is_valid_path(path: &[Hash], root: Hash) -> bool {
 }
 
 /// Verifies that a given merkle root contains the leaf using the provided proof.
-pub fn verify<const N: usize>(root: Hash, proof: &[Hash], leaf: Leaf) -> bool {
-    if proof.len() != N {
-        return false;
-    }
+pub fn verify<Root, Item, L>(
+    root: Root,
+    proof: &[Item],
+    leaf: L,
+) -> bool
+where
+    Root: Into<Hash>,
+    Item: Into<Hash> + Copy,
+    L: Into<Leaf>,
+{
+    let root_h: Hash = root.into();
+    let proof_hashes: Vec<Hash> = 
+        proof.iter()
+          .map(|&x| x.into())
+          .collect();
 
-    let computed_path = compute_path(proof, leaf);
-    is_valid_path(&computed_path, root)
+    let leaf_h: Leaf = leaf.into();
+    let path = compute_path(&proof_hashes, leaf_h);
+    is_valid_path(&path, root_h)
 }
+
 
 #[cfg(test)]
 mod tests {
@@ -487,7 +500,18 @@ mod tests {
         ];
         let proof = tree.get_merkle_proof(&leaves, 0);
         
-        // Verify the proof
-        assert!(verify::<3>(tree.get_root(), &proof, Leaf::new(&[b"val_1"])));
+        // Verify proof (typed)
+        assert!(verify(tree.get_root(), &proof, Leaf::new(&[b"val_1"])));
+
+        let a : [u8; 32] = tree.get_root().to_bytes();
+        let b : [[u8; 32]; 3] = [
+            proof[0].to_bytes(),
+            proof[1].to_bytes(),
+            proof[2].to_bytes(),
+        ];
+        let c : [u8; 32] = Leaf::new(&[b"val_1"]).to_bytes();
+
+        // Verify proof (generic)
+        assert!(verify(a, &b, c));
     }
 }

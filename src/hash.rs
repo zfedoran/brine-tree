@@ -27,6 +27,12 @@ impl From<[u8; HASH_BYTES]> for Hash {
     }
 }
 
+impl From<[u8; HASH_BYTES]> for Leaf {
+    fn from(from: [u8; 32]) -> Self {
+        Self { 0: Hash { value: from } }
+    }
+}
+
 impl AsRef<[u8]> for Hash {
     fn as_ref(&self) -> &[u8] {
         &self.value
@@ -72,6 +78,10 @@ impl Leaf {
         let mut inputs = vec![b"LEAF".as_ref()];
         inputs.extend(data);
         Leaf(hashv(&inputs))
+    }
+
+    pub fn to_bytes(self) -> [u8; HASH_BYTES] {
+        self.0.value
     }
 }
 
