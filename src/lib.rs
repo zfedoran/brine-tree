@@ -6,4 +6,5 @@ pub mod utils;
 pub mod tree;
 
 pub use tree::MerkleTree;
-pub use hash::{Hash, hash, hashv};
+pub use hash::{Hash, Leaf, hash, hashv};
+pub use error::BrineTreeError;

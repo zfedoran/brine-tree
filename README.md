@@ -32,15 +32,28 @@ A fast, low-overhead, Merkle tree library for the Solana programs.
 ## 🚀 Quick Start
 
 ```rust
-use brine_tree::{ MerkleTree, Hash };
+use brine_tree::{MerkleTree, Leaf};
 
-let seeds: &[&[u8]] = &[b"seed"];
-let mut tree: MerkleTree<3> = MerkleTree::new(seeds);
-let value = Hash::new_from_array([1; 32]);
+fn main() {
+    const TREE_DEPTH: usize = 18;
 
-tree.try_insert(value)?;
-let proof = tree.get_merkle_proof(&[value], 0);
-assert!(tree.contains(&proof, value));
+    let mut tree = MerkleTree::<{TREE_DEPTH}>::new(&[b"empty_leaf_seed"]);
+    let data = &[b"hello", b"world"];
+    let leaf = Leaf::new(data);
+
+    tree.try_add_leaf(leaf)?;
+
+    // Off-chain proof generation
+
+    let db = &[leaf, ...]; // your database of leaves
+    let leaf_index = 0; // index of the leaf you want to prove
+
+    let proof = tree.get_merkle_proof(db, leaf_index)?;
+    
+    assert!(tree.contains(&proof, data));
+
+    Ok(())
+}
 ```
 
 Returns `Ok(())` for successful operations or `Err(ProgramError)` if invalid.

@@ -8,8 +8,12 @@ pub const HASH_BYTES: usize = 32;
 #[repr(C)]
 #[derive(Clone, Copy, PartialEq, Debug, Default, Pod, Zeroable)]
 pub struct Hash {
-   pub(crate) value: [u8; 32]
+    pub(crate) value: [u8; 32],
 }
+
+#[repr(C)]
+#[derive(Clone, Copy, PartialEq, Debug, Pod, Zeroable)]
+pub struct Leaf(Hash);
 
 impl From<Hash> for [u8; HASH_BYTES] {
     fn from(from: Hash) -> Self {
@@ -29,11 +33,25 @@ impl AsRef<[u8]> for Hash {
     }
 }
 
+impl AsRef<[u8]> for Leaf {
+    fn as_ref(&self) -> &[u8] {
+        &self.0.value
+    }
+}
+
+impl From<Leaf> for Hash {
+    fn from(leaf: Leaf) -> Self {
+        leaf.0
+    }
+}
+
 impl Hash {
     pub const LEN: usize = HASH_BYTES;
 
     pub fn new(hash_slice: &[u8]) -> Self {
-        Hash { value: <[u8; HASH_BYTES]>::try_from(hash_slice).unwrap() }
+        Hash {
+            value: <[u8; HASH_BYTES]>::try_from(hash_slice).unwrap(),
+        }
     }
 
     pub const fn new_from_array(hash_array: [u8; HASH_BYTES]) -> Self {
@@ -42,6 +60,18 @@ impl Hash {
 
     pub fn to_bytes(self) -> [u8; HASH_BYTES] {
         self.value
+    }
+
+    pub fn as_leaf(self) -> Leaf {
+        Leaf(self)
+    }
+}
+
+impl Leaf {
+    pub fn new(data: &[&[u8]]) -> Self {
+        let mut inputs = vec![b"LEAF".as_ref()];
+        inputs.extend(data);
+        Leaf(hashv(&inputs))
     }
 }
 
