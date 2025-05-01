@@ -12,20 +12,10 @@ A fast, low-overhead, Merkle tree library for the Solana programs.
 
 ## ✨ Features
 
-- Supports insertion, removal, and replacement of leaves
-- Validates inclusion proofs efficiently
-- Zero-copy compatibility with `bytemuck` for fast serialization
-
----
-
-## 🧱 Use Cases
-
-- State compression for large datasets
-- Whitelist or access control verification
-- Off-chain data integrity checks
-- Cross-chain state proofs
-- Decentralized identity claims
-- Oracle data validation
+- Support for add, remove, replace
+- Low compute unit (CU) consumption
+- Can be stored in account state
+- Zero-copy
 
 ---
 
@@ -58,18 +48,28 @@ fn main() {
 
 Returns `Ok(())` for successful operations or `Err(ProgramError)` if invalid.
 
+---
+
+## 🧱 Use Cases
+
+- State compression for large datasets
+- Whitelist or access control verification
+- Off-chain data integrity checks
+- Cross-chain state proofs
+- Decentralized identity claims
+- Oracle data validation
+
+---
+
 ### But why?
 
 **Q: Why not use an off-chain Merkle tree?**  
 **A:** Solana programs often need to verify inclusion or manage state on-chain efficiently. Off-chain Merkle trees require additional infrastructure and trust assumptions. 
 
 **Q: Why not use something else?**  
-**A:** There definitely are a few [other](https://github.com/anza-xyz/agave/blob/master/merkle-tree/src/merkle_tree.rs) implementations worth looking into, like [concurrent merkle tree](https://github.com/solana-labs/solana-program-library/blob/master/libraries/concurrent-merkle-tree/src/concurrent_merkle_tree.rs), but this one is simple and easy to work with. This crate, brine-tree, provides:
+**A:** There definitely are a few [other](https://github.com/anza-xyz/agave/blob/master/merkle-tree/src/merkle_tree.rs) implementations worth looking into, like [concurrent merkle tree](https://github.com/solana-labs/solana-program-library/blob/master/libraries/concurrent-merkle-tree/src/concurrent_merkle_tree.rs), but this one is simple and easy to work with. 
 
-- Simple, on-chain Merkle tree construction and verification
-- Support for dynamic updates (insert, remove, replace)
-- Low compute unit (CU) consumption
-- Can be stored in account state
+---
 
 ## 🙌 Contributing
 

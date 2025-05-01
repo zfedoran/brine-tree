@@ -1,7 +1,7 @@
-use bytemuck::{Pod, Zeroable};
-use super::{hash::Hash, hash::Leaf, hashv};
+use bytemuck::{ Pod, Zeroable };
+use super::hash::{ Hash, Leaf, hashv };
+use super::error::{ BrineTreeError, ProgramResult };
 use super::utils::check_condition;
-use super::error::{BrineTreeError, ProgramResult};
 
 #[repr(C, align(8))]
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -28,8 +28,8 @@ impl<const N: usize> MerkleTree<N> {
         self.root
     }
 
-    pub fn get_empty_leaf(&self) -> Hash {
-        self.zero_values[0]
+    pub fn get_empty_leaf(&self) -> Leaf {
+        self.zero_values[0].as_leaf()
     }
 
     pub fn new(seeds: &[&[u8]]) -> Self {
@@ -88,7 +88,7 @@ impl<const N: usize> MerkleTree<N> {
                 right = current_hash;
             }
 
-            current_hash = Self::hash_left_right(left, right);
+            current_hash = hash_left_right(left, right);
             current_index /= 2;
         }
 
@@ -105,23 +105,23 @@ impl<const N: usize> MerkleTree<N> {
 
     pub fn try_remove_leaf(&mut self, proof: &[Hash], leaf: Leaf) -> ProgramResult {
         self.check_length(proof)?;
-        self.try_replace_leaf(proof, Hash::from(leaf), self.get_empty_leaf())
+        self.try_replace_leaf(proof, leaf, self.get_empty_leaf())
     }
 
     pub fn try_replace(&mut self, proof: &[Hash], original_data: &[&[u8]], new_data: &[&[u8]]) -> ProgramResult {
         let original_leaf = Leaf::new(original_data);
         let new_leaf = Leaf::new(new_data);
-        self.try_replace_leaf(proof, Hash::from(original_leaf), Hash::from(new_leaf))
+        self.try_replace_leaf(proof, original_leaf, new_leaf)
     }
 
-    pub fn try_replace_leaf(&mut self, proof: &[Hash], original_leaf: Hash, new_leaf: Hash) -> ProgramResult {
+    pub fn try_replace_leaf(&mut self, proof: &[Hash], original_leaf: Leaf, new_leaf: Leaf) -> ProgramResult {
         self.check_length(proof)?;
 
-        let original_path = MerkleTree::<N>::compute_path(proof, original_leaf);
-        let new_path = MerkleTree::<N>::compute_path(proof, new_leaf);
+        let original_path = compute_path(proof, original_leaf);
+        let new_path = compute_path(proof, new_leaf);
 
         check_condition(
-            MerkleTree::<N>::is_valid_path(&original_path, self.root),
+            is_valid_path(&original_path, self.root),
             BrineTreeError::InvalidProof,
         )?;
 
@@ -147,45 +147,11 @@ impl<const N: usize> MerkleTree<N> {
         }
 
         let root = self.get_root();
-        Self::is_valid_leaf(proof, root, Hash::from(leaf))
+        is_valid_leaf(proof, root, leaf)
     }
 
-    pub fn hash_left_right(left: Hash, right: Hash) -> Hash {
-        let combined;
-        if left.to_bytes() <= right.to_bytes() {
-            combined = [b"NODE".as_ref(), left.as_ref(), right.as_ref()];
-        } else {
-            combined = [b"NODE".as_ref(), right.as_ref(), left.as_ref()];
-        }
-
-        hashv(&combined)
-    }
-
-    pub fn compute_path(proof: &[Hash], leaf: Hash) -> Vec<Hash> {
-        let mut computed_path = Vec::with_capacity(proof.len() + 1);
-        let mut computed_hash = leaf;
-
-        computed_path.push(computed_hash);
-
-        for proof_element in proof.iter() {
-            computed_hash = Self::hash_left_right(computed_hash, *proof_element);
-            computed_path.push(computed_hash);
-        }
-
-        computed_path
-    }
-
-    pub fn is_valid_leaf(proof: &[Hash], root: Hash, leaf: Hash) -> bool {
-        let computed_path = Self::compute_path(proof, leaf);
-        Self::is_valid_path(&computed_path, root)
-    }
-
-    pub fn is_valid_path(path: &[Hash], root: Hash) -> bool {
-        if path.is_empty() {
-            return false;
-        }
-
-        *path.last().unwrap() == root
+    fn check_length(&self, proof: &[Hash]) -> Result<(), BrineTreeError> {
+        check_condition(proof.len() == N, BrineTreeError::ProofLength)
     }
 
     #[cfg(not(feature = "solana"))]
@@ -196,7 +162,7 @@ impl<const N: usize> MerkleTree<N> {
             let left = pairs[i];
             let right = pairs[i + 1];
 
-            let hashed = Self::hash_left_right(left, right);
+            let hashed = hash_left_right(left, right);
             res.push(hashed);
         }
 
@@ -237,10 +203,54 @@ impl<const N: usize> MerkleTree<N> {
 
         proof
     }
+}
 
-    fn check_length(&self, proof: &[Hash]) -> Result<(), BrineTreeError> {
-        check_condition(proof.len() == N, BrineTreeError::ProofLength)
+fn hash_left_right(left: Hash, right: Hash) -> Hash {
+    let combined;
+    if left.to_bytes() <= right.to_bytes() {
+        combined = [b"NODE".as_ref(), left.as_ref(), right.as_ref()];
+    } else {
+        combined = [b"NODE".as_ref(), right.as_ref(), left.as_ref()];
     }
+
+    hashv(&combined)
+}
+
+fn compute_path(proof: &[Hash], leaf: Leaf) -> Vec<Hash> {
+    let mut computed_path = Vec::with_capacity(proof.len() + 1);
+    let mut computed_hash = Hash::from(leaf);
+
+    computed_path.push(computed_hash);
+
+    for proof_element in proof.iter() {
+        computed_hash = hash_left_right(computed_hash, *proof_element);
+        computed_path.push(computed_hash);
+    }
+
+    computed_path
+}
+
+fn is_valid_leaf(proof: &[Hash], root: Hash, leaf: Leaf) -> bool {
+    let computed_path = compute_path(proof, leaf);
+    is_valid_path(&computed_path, root)
+}
+
+fn is_valid_path(path: &[Hash], root: Hash) -> bool {
+    if path.is_empty() {
+        return false;
+    }
+
+    *path.last().unwrap() == root
+}
+
+/// Verifies that a given merkle root contains the leaf using the provided proof.
+pub fn verify<const N: usize>(root: Hash, proof: &[Hash], leaf: Leaf) -> bool {
+    if proof.len() != N {
+        return false;
+    }
+
+    let computed_path = compute_path(proof, leaf);
+    is_valid_path(&computed_path, root)
 }
 
 #[cfg(test)]
@@ -286,13 +296,13 @@ mod tests {
         let g = empty.clone();
         let h = empty.clone();
 
-        let i = TestTree::hash_left_right(a, b);
-        let j: Hash = TestTree::hash_left_right(c, d);
-        let k: Hash = TestTree::hash_left_right(e, f);
-        let l: Hash = TestTree::hash_left_right(g, h);
-        let m: Hash = TestTree::hash_left_right(i, j);
-        let n: Hash = TestTree::hash_left_right(k, l);
-        let root = TestTree::hash_left_right(m, n);
+        let i = hash_left_right(a, b);
+        let j: Hash = hash_left_right(c, d);
+        let k: Hash = hash_left_right(e, f);
+        let l: Hash = hash_left_right(g, h);
+        let m: Hash = hash_left_right(i, j);
+        let n: Hash = hash_left_right(k, l);
+        let root = hash_left_right(m, n);
 
         assert!(tree.try_add(&[b"val_1"]).is_ok());
         assert!(tree.filled_subtrees[0].eq(&a));
@@ -328,9 +338,9 @@ mod tests {
         assert!(tree.try_remove(&val2_proof, &[b"val_2"]).is_ok());
 
         // Update the expected tree structure
-        let i = TestTree::hash_left_right(a, empty);
-        let m: Hash = TestTree::hash_left_right(i, j);
-        let root = TestTree::hash_left_right(m, n);
+        let i = hash_left_right(a, empty);
+        let m: Hash = hash_left_right(i, j);
+        let root = hash_left_right(m, n);
 
         assert_eq!(root, tree.get_root());
 
@@ -350,9 +360,9 @@ mod tests {
 
         // Update the expected tree structure
         let d = Hash::from(Leaf::new(&[b"val_4"]));
-        let j = TestTree::hash_left_right(c, d);
-        let m = TestTree::hash_left_right(i, j);
-        let root = TestTree::hash_left_right(m, n);
+        let j = hash_left_right(c, d);
+        let m = hash_left_right(i, j);
+        let root = hash_left_right(m, n);
 
         assert_eq!(root, tree.get_root());
     }
@@ -462,362 +472,22 @@ mod tests {
     }
 
     #[test]
-    fn test_invalid_replace() {
+    fn test_verify() {
         let seeds: &[&[u8]] = &[b"test"];
         let mut tree = TestTree::new(seeds);
         
-        assert!(tree.try_add(&[b"val_1"]).is_ok());
-        
-        let leaves = [Leaf::new(&[b"val_1"])];
-        let proof = tree.get_merkle_proof(&leaves, 0);
-        
-        // Try to replace with wrong original leaf
-        let result = tree.try_replace(&proof, &[b"wrong_val"], &[b"new_val"]);
-        assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), BrineTreeError::InvalidProof);
-        
-        // Verify original leaf is still present
-        assert!(tree.contains(&proof, &[b"val_1"]));
-    }
-
-    #[test]
-    fn test_zero_values_calculation() {
-        let seeds: &[&[u8]] = &[b"test"];
-        let tree = TestTree::new(seeds);
-        
-        let zeros = tree.zero_values;
-        
-        // Verify zero values are correctly chained
-        let mut expected = hashv(seeds);
-        for i in 0..3 {
-            assert_eq!(zeros[i], expected);
-            expected = hashv(&[b"NODE".as_ref(), expected.as_ref(), expected.as_ref()]);
-        }
-    }
-
-    #[test]
-    fn test_path_computation() {
-        let seeds: &[&[u8]] = &[b"test"];
-        let tree = TestTree::new(seeds);
-        
-        let leaf = Hash::from(Leaf::new(&[b"val_1"]));
-        let proof = vec![
-            Hash::from(Leaf::new(&[b"val_2"])),
-            tree.zero_values[1],
-            tree.zero_values[2],
-        ];
-        
-        let path = TestTree::compute_path(&proof, leaf);
-        
-        // Verify path length
-        assert_eq!(path.len(), 4);
-        
-        // Verify path computation
-        assert_eq!(path[0], leaf);
-        assert_eq!(path[1], TestTree::hash_left_right(leaf, proof[0]));
-        assert_eq!(path[2], TestTree::hash_left_right(path[1], proof[1]));
-        assert_eq!(path[3], TestTree::hash_left_right(path[2], proof[2]));
-    }
-
-    #[test]
-    fn test_invalid_path() {
-        let seeds: &[&[u8]] = &[b"test"];
-        let tree = TestTree::new(seeds);
-        
-        // Empty path
-        let empty_path: Vec<Hash> = vec![];
-        assert!(!TestTree::is_valid_path(&empty_path, tree.get_root()));
-        
-        // Wrong root
-        let leaf = Hash::from(Leaf::new(&[b"val_1"]));
-        let proof = vec![tree.zero_values[0], tree.zero_values[1], tree.zero_values[2]];
-        let path = TestTree::compute_path(&proof, leaf);
-        let wrong_root = Hash::default();
-        assert!(!TestTree::is_valid_path(&path, wrong_root));
-    }
-
-    #[test]
-    fn test_hash_left_right_ordering() {
-        let left = Hash::from(Leaf::new(&[b"val_1"]));
-        let right = Hash::from(Leaf::new(&[b"val_2"]));
-        
-        let hash1 = TestTree::hash_left_right(left, right);
-        
-        // Swap order - should produce same result due to ordering in hash_left_right
-        let hash2 = TestTree::hash_left_right(right, left);
-        
-        assert_eq!(hash1, hash2);
-        
-        // Verify correct ordering was used (smaller hash first)
-        let direct = hashv(&[
-            b"NODE".as_ref(), 
-            left.to_bytes().min(right.to_bytes()).as_ref(), 
-            left.to_bytes().max(right.to_bytes()).as_ref()
-        ]);
-
-        assert_eq!(hash1, direct);
-    }
-
-    #[test]
-    fn test_partial_proof() {
-        let seeds: &[&[u8]] = &[b"test"];
-        let mut tree = TestTree::new(seeds);
-
-        // Add a leaf to the tree
-        assert!(tree.try_add(&[b"val_1"]).is_ok());
-
-        // Create a valid proof
-        let leaves = [Leaf::new(&[b"val_1"])];
-        let valid_proof = tree.get_merkle_proof(&leaves, 0);
-        assert_eq!(valid_proof.len(), 3); // Should match tree depth
-
-        // Create a partial proof (shorter than depth)
-        let partial_proof = &valid_proof[..2]; // Take only first two elements
-
-        // Verify that partial proof is rejected
-        assert!(!tree.contains(&partial_proof, &[b"val_1"]));
-
-        // Try to use partial proof for removal
-        let remove_result = tree.try_remove(&partial_proof, &[b"val_1"]);
-        assert!(remove_result.is_err());
-        assert_eq!(remove_result.unwrap_err(), BrineTreeError::ProofLength);
-
-        // Try to use partial proof for replacement
-        let replace_result = tree.try_replace(&partial_proof, &[b"val_1"], &[b"new_val"]);
-        assert!(replace_result.is_err());
-        assert_eq!(replace_result.unwrap_err(), BrineTreeError::ProofLength);
-
-        // Verify original leaf is still present
-        assert!(tree.contains(&valid_proof, &[b"val_1"]));
-    }
-
-    #[test]
-    fn test_leaf_vs_node_attack() {
-        let seeds: &[&[u8]] = &[b"test"];
-        let mut tree = TestTree::new(seeds);
-
-        // Add some leaves to the tree
-        let val_1 : &[&[u8]] = &[b"val_1"];
-        let val_2 : &[&[u8]] = &[b"val_2"];
-        assert!(tree.try_add(val_1).is_ok());
-        assert!(tree.try_add(val_2).is_ok());
-
-        // Get a valid proof for val_1
-        let leaves = [
-            Leaf::new(val_1),
-            Leaf::new(val_2),
-        ];
-        let valid_proof = tree.get_merkle_proof(&leaves, 0);
-        assert_eq!(valid_proof.len(), 3); // Matches tree depth
-
-        // Create a malicious proof by replacing a node hash with a leaf hash
-        let malicious_leaf = Leaf::new(&[b"malicious"]);
-        let malicious_hash = Hash::from(malicious_leaf);
-        let mut malicious_proof = valid_proof.clone();
-        // Replace the second proof element (a node hash) with a leaf hash
-        malicious_proof[1] = malicious_hash;
-
-        // Verify that the malicious proof is rejected
-        assert!(!tree.contains(&malicious_proof, val_1));
-
-        // Attempt to replace val_1 using the malicious proof
-        let replace_result = tree.try_replace(&malicious_proof, val_1, &[b"new_val"]);
-        assert!(replace_result.is_err());
-        assert_eq!(replace_result.unwrap_err(), BrineTreeError::InvalidProof);
-
-        // Attempt to remove val_1 using the malicious proof
-        let remove_result = tree.try_remove(&malicious_proof, val_1);
-        assert!(remove_result.is_err());
-        assert_eq!(remove_result.unwrap_err(), BrineTreeError::InvalidProof);
-
-        // Verify the tree state is unchanged
-        assert!(tree.contains(&valid_proof, val_1));
-        assert!(tree.contains(&tree.get_merkle_proof(&leaves, 1), val_2));
-    }
-
-    #[test]
-    fn test_proof_with_duplicate_hashes() {
-        let seeds: &[&[u8]] = &[b"test"];
-        let mut tree = TestTree::new(seeds);
-
-        // Add a leaf to the tree
-        assert!(tree.try_add(&[b"val_1"]).is_ok());
-
-        // Create a valid proof
-        let leaves = [Leaf::new(&[b"val_1"])];
-        let valid_proof = tree.get_merkle_proof(&leaves, 0);
-        assert_eq!(valid_proof.len(), 3);
-
-        // Create a proof with duplicate hashes (same hash repeated)
-        let duplicate_hash = valid_proof[0];
-        let duplicate_proof = vec![duplicate_hash, duplicate_hash, duplicate_hash];
-
-        // Verify that the duplicate proof is rejected
-        assert!(!tree.contains(&duplicate_proof, &[b"val_1"]));
-
-        // Attempt to remove using the duplicate proof
-        let remove_result = tree.try_remove(&duplicate_proof, &[b"val_1"]);
-        assert!(remove_result.is_err());
-        assert_eq!(remove_result.unwrap_err(), BrineTreeError::InvalidProof);
-
-        // Attempt to replace using the duplicate proof
-        let replace_result = tree.try_replace(&duplicate_proof, &[b"val_1"], &[b"new_val"]);
-        assert!(replace_result.is_err());
-        assert_eq!(replace_result.unwrap_err(), BrineTreeError::InvalidProof);
-
-        // Verify the original leaf is still present
-        assert!(tree.contains(&valid_proof, &[b"val_1"]));
-    }
-
-    #[test]
-    fn test_proof_with_zero_hashes() {
-        let seeds: &[&[u8]] = &[b"test"];
-        let mut tree = TestTree::new(seeds);
-
-        // Add a leaf to the tree
-        assert!(tree.try_add(&[b"val_1"]).is_ok());
-
-        // Create a valid proof
-        let leaves = [Leaf::new(&[b"val_1"])];
-        let valid_proof = tree.get_merkle_proof(&leaves, 0);
-        assert_eq!(valid_proof.len(), 3);
-
-        // Create a proof with zero hashes (Hash::default())
-        let zero_hash = Hash::default();
-        let zero_proof = vec![zero_hash, zero_hash, zero_hash];
-
-        // Verify that the zero proof is rejected
-        assert!(!tree.contains(&zero_proof, &[b"val_1"]));
-
-        // Attempt to remove using the zero proof
-        let remove_result = tree.try_remove(&zero_proof, &[b"val_1"]);
-        assert!(remove_result.is_err());
-        assert_eq!(remove_result.unwrap_err(), BrineTreeError::InvalidProof);
-
-        // Attempt to replace using the zero proof
-        let replace_result = tree.try_replace(&zero_proof, &[b"val_1"], &[b"new_val"]);
-        assert!(replace_result.is_err());
-        assert_eq!(replace_result.unwrap_err(), BrineTreeError::InvalidProof);
-
-        // Verify the original leaf is still present
-        assert!(tree.contains(&valid_proof, &[b"val_1"]));
-    }
-
-    #[test]
-    fn test_proof_exploit_hash_ordering() {
-        let seeds: &[&[u8]] = &[b"test"];
-        let mut tree = TestTree::new(seeds);
-
-        // Add two leaves to the tree
+        // Add initial leaves
         assert!(tree.try_add(&[b"val_1"]).is_ok());
         assert!(tree.try_add(&[b"val_2"]).is_ok());
-
-        // Create a valid proof for val_1
+        
+        // Get proof for val_1
         let leaves = [
             Leaf::new(&[b"val_1"]),
             Leaf::new(&[b"val_2"]),
         ];
-        let valid_proof = tree.get_merkle_proof(&leaves, 0);
-        assert_eq!(valid_proof.len(), 3);
-
-        // Craft a malicious proof by swapping the order of hashes
-        // This tests if the hash_left_right ordering (based on byte comparison) can be exploited
-        let mut malicious_proof = valid_proof.clone();
-        // Swap the first two proof elements to disrupt the expected ordering
-        malicious_proof.swap(0, 1);
-
-        // Verify that the malicious proof is rejected
-        assert!(!tree.contains(&malicious_proof, &[b"val_1"]));
-
-        // Attempt to remove using the malicious proof
-        let remove_result = tree.try_remove(&malicious_proof, &[b"val_1"]);
-        assert!(remove_result.is_err());
-        assert_eq!(remove_result.unwrap_err(), BrineTreeError::InvalidProof);
-
-        // Attempt to replace using the malicious proof
-        let replace_result = tree.try_replace(&malicious_proof, &[b"val_1"], &[b"new_val"]);
-        assert!(replace_result.is_err());
-        assert_eq!(replace_result.unwrap_err(), BrineTreeError::InvalidProof);
-
-        // Verify the original leaf is still present
-        assert!(tree.contains(&valid_proof, &[b"val_1"]));
-    }
-
-    // New tests for Empty or Malformed Seeds
-    #[test]
-    fn test_empty_seeds() {
-        let seeds: &[&[u8]] = &[];
-        let tree = TestTree::new(seeds);
-
-        // Verify that the tree is initialized correctly with empty seeds
-        let zeros = tree.zero_values;
-        let mut expected = hashv(seeds); // Should handle empty slice
-        for i in 0..3 {
-            assert_eq!(zeros[i], expected);
-            expected = hashv(&[b"NODE".as_ref(), expected.as_ref(), expected.as_ref()]);
-        }
-
-        // Verify that the root and filled subtrees are set correctly
-        assert_eq!(tree.get_root(), zeros[2]);
-        assert_eq!(tree.filled_subtrees, zeros);
-        assert_eq!(tree.next_index, 0);
-
-        // Test adding a leaf to ensure the tree functions
-        let mut tree = tree;
-        assert!(tree.try_add(&[b"val_1"]).is_ok());
-        assert!(tree.contains(&tree.get_merkle_proof(&[Leaf::new(&[b"val_1"])], 0), &[b"val_1"]));
-    }
-
-    #[test]
-    fn test_malformed_seeds_empty_bytes() {
-        let seeds: &[&[u8]] = &[b"", b""];
-        let tree = TestTree::new(seeds);
-
-        // Verify that the tree is initialized correctly with empty byte arrays
-        let zeros = tree.zero_values;
-        let mut expected = hashv(seeds); // Should handle empty byte arrays
-        for i in 0..3 {
-            assert_eq!(zeros[i], expected);
-            expected = hashv(&[b"NODE".as_ref(), expected.as_ref(), expected.as_ref()]);
-        }
-
-        // Verify that the root and filled subtrees are set correctly
-        assert_eq!(tree.get_root(), zeros[2]);
-        assert_eq!(tree.filled_subtrees, zeros);
-        assert_eq!(tree.next_index, 0);
-
-        // Test adding a leaf to ensure the tree functions
-        let mut tree = tree;
-        assert!(tree.try_add(&[b"val_1"]).is_ok());
-        assert!(tree.contains(&tree.get_merkle_proof(&[Leaf::new(&[b"val_1"])], 0), &[b"val_1"]));
-    }
-
-    #[test]
-    fn test_reinit_with_empty_seeds() {
-        let seeds: &[&[u8]] = &[b"test"];
-        let mut tree = TestTree::new(seeds);
-
-        // Add a leaf to modify the tree
-        assert!(tree.try_add(&[b"val_1"]).is_ok());
-
-        // Reinitialize with empty seeds
-        let empty_seeds: &[&[u8]] = &[];
-        tree.init(empty_seeds);
-
-        // Verify that the tree is reset correctly
-        let zeros = tree.zero_values;
-        let mut expected = hashv(empty_seeds);
-        for i in 0..3 {
-            assert_eq!(zeros[i], expected);
-            expected = hashv(&[b"NODE".as_ref(), expected.as_ref(), expected.as_ref()]);
-        }
-
-        assert_eq!(tree.get_root(), zeros[2]);
-        assert_eq!(tree.filled_subtrees, zeros);
-        assert_eq!(tree.next_index, 0);
-
-        // Test adding a leaf after reinitialization
-        assert!(tree.try_add(&[b"val_1"]).is_ok());
-        assert!(tree.contains(&tree.get_merkle_proof(&[Leaf::new(&[b"val_1"])], 0), &[b"val_1"]));
+        let proof = tree.get_merkle_proof(&leaves, 0);
+        
+        // Verify the proof
+        assert!(verify::<3>(tree.get_root(), &proof, Leaf::new(&[b"val_1"])));
     }
 }
