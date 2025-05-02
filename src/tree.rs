@@ -154,7 +154,6 @@ impl<const N: usize> MerkleTree<N> {
         check_condition(proof.len() == N, BrineTreeError::ProofLength)
     }
 
-    #[cfg(not(feature = "solana"))]
     fn hash_pairs(pairs: Vec<Hash>) -> Vec<Hash> {
         let mut res = Vec::with_capacity(pairs.len() / 2);
 
@@ -169,10 +168,9 @@ impl<const N: usize> MerkleTree<N> {
         res
     }
 
-    #[cfg(not(feature = "solana"))]
-    pub fn get_merkle_proof(&self, values: &[Leaf], index: usize) -> Vec<Hash> {
+    pub fn get_merkle_proof(&self, leaves: &[Leaf], leaf_index: usize) -> Vec<Hash> {
         let mut layers = Vec::with_capacity(N);
-        let mut current_layer: Vec<Hash> = values.iter().map(|leaf| Hash::from(*leaf)).collect();
+        let mut current_layer: Vec<Hash> = leaves.iter().map(|leaf| Hash::from(*leaf)).collect();
 
         for i in 0..N {
             if current_layer.len() % 2 != 0 {
@@ -184,7 +182,7 @@ impl<const N: usize> MerkleTree<N> {
         }
 
         let mut proof = Vec::with_capacity(N);
-        let mut current_index = index;
+        let mut current_index = leaf_index;
         let mut layer_index = 0;
         let mut sibling;
 
