@@ -50,6 +50,14 @@ impl<const N: usize> MerkleTree<N> {
         self.zero_values = zeros;
     }
 
+    pub fn get_leaf_count(&self) -> u64 {
+        self.next_index
+    }
+
+    pub fn get_capacity(&self) -> u64 {
+        1u64 << N
+    }
+
     fn calc_zeros(seeds: &[&[u8]]) -> [Hash; N] {
         let mut zeros: [Hash; N] = [Hash::default(); N];
         let mut current = hashv(seeds);

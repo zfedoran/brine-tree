@@ -161,7 +161,7 @@ dependencies = [
 
 [[package]]
 name = "brine-tree"
-version = "0.5.2"
+version = "0.5.3"
 dependencies = [
  "bytemuck",
  "sha3",
