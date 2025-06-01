@@ -106,56 +106,99 @@ impl<const N: usize> MerkleTree<N> {
         Ok(())
     }
 
-    pub fn try_remove(&mut self, proof: &[Hash], data: &[&[u8]]) -> ProgramResult {
-        let leaf = Leaf::new(data);
-        self.try_remove_leaf(proof, leaf)
+    pub fn try_remove<P>(
+        &mut self,
+        proof: &[P],
+        data: &[&[u8]],
+    ) -> ProgramResult
+    where
+        P: Into<Hash> + Copy,
+    {
+        let proof_hashes: Vec<Hash> = proof.iter().map(|p| (*p).into()).collect();
+        let original_leaf = Leaf::new(data);
+        self.try_remove_leaf(&proof_hashes, original_leaf)
     }
 
-    pub fn try_remove_leaf(&mut self, proof: &[Hash], leaf: Leaf) -> ProgramResult {
-        self.check_length(proof)?;
-        self.try_replace_leaf(proof, leaf, self.get_empty_leaf())
+    pub fn try_remove_leaf<P>(
+        &mut self,
+        proof: &[P],
+        leaf: Leaf,
+    ) -> ProgramResult
+    where
+        P: Into<Hash> + Copy,
+    {
+        let proof_hashes: Vec<Hash> = proof.iter().map(|p| (*p).into()).collect();
+        self.check_length(&proof_hashes)?;
+        self.try_replace_leaf(&proof_hashes, leaf, self.get_empty_leaf())
     }
 
-    pub fn try_replace(&mut self, proof: &[Hash], original_data: &[&[u8]], new_data: &[&[u8]]) -> ProgramResult {
+    pub fn try_replace<P>(
+        &mut self,
+        proof: &[P],
+        original_data: &[&[u8]],
+        new_data: &[&[u8]],
+    ) -> ProgramResult
+    where
+        P: Into<Hash> + Copy,
+    {
+        let proof_hashes: Vec<Hash> = proof.iter().map(|p| (*p).into()).collect();
         let original_leaf = Leaf::new(original_data);
         let new_leaf = Leaf::new(new_data);
-        self.try_replace_leaf(proof, original_leaf, new_leaf)
+        self.try_replace_leaf(&proof_hashes, original_leaf, new_leaf)
     }
 
-    pub fn try_replace_leaf(&mut self, proof: &[Hash], original_leaf: Leaf, new_leaf: Leaf) -> ProgramResult {
-        self.check_length(proof)?;
-
-        let original_path = compute_path(proof, original_leaf);
-        let new_path = compute_path(proof, new_leaf);
-
+    pub fn try_replace_leaf<P>(
+        &mut self,
+        proof: &[P],
+        original_leaf: Leaf,
+        new_leaf: Leaf,
+    ) -> ProgramResult
+    where
+        P: Into<Hash> + Copy,
+    {
+        let proof_hashes: Vec<Hash> = proof.iter().map(|p| (*p).into()).collect();
+        self.check_length(&proof_hashes)?;
+        let original_path = compute_path(&proof_hashes, original_leaf);
+        let new_path = compute_path(&proof_hashes, new_leaf);
         check_condition(
             is_valid_path(&original_path, self.root),
             BrineTreeError::InvalidProof,
         )?;
-
         for i in 0..N {
             if original_path[i] == self.filled_subtrees[i] {
                 self.filled_subtrees[i] = new_path[i];
             }
         }
-
         self.root = *new_path.last().unwrap();
-
         Ok(())
     }
 
-    pub fn contains(&self, proof: &[Hash], data: &[&[u8]]) -> bool {
+    pub fn contains<P>(
+        &self,
+        proof: &[P],
+        data: &[&[u8]],
+    ) -> bool
+    where
+        P: Into<Hash> + Copy,
+    {
+        let proof_hashes: Vec<Hash> = proof.iter().map(|p| (*p).into()).collect();
         let leaf = Leaf::new(data);
-        self.contains_leaf(proof, leaf)
+        self.contains_leaf(&proof_hashes, leaf)
     }
 
-    pub fn contains_leaf(&self, proof: &[Hash], leaf: Leaf) -> bool {
-        if let Err(_) = self.check_length(proof) {
+    pub fn contains_leaf<P>(
+        &self,
+        proof: &[P],
+        leaf: Leaf,
+    ) -> bool
+    where
+        P: Into<Hash> + Copy,
+    {
+        let proof_hashes: Vec<Hash> = proof.iter().map(|p| (*p).into()).collect();
+        if self.check_length(&proof_hashes).is_err() {
             return false;
         }
-
-        let root = self.get_root();
-        is_valid_leaf(proof, root, leaf)
+        is_valid_leaf(&proof_hashes, self.root, leaf)
     }
 
     fn check_length(&self, proof: &[Hash]) -> Result<(), BrineTreeError> {
