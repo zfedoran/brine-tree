@@ -184,10 +184,10 @@ dependencies = [
 name = "brine-tree"
 version = "0.6.0"
 dependencies = [
+ "blake3",
  "bytemuck",
  "criterion",
  "rand 0.8.5",
- "sha3",
  "solana-program",
 ]
 

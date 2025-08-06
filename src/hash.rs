@@ -1,7 +1,7 @@
 use bytemuck::{Pod, Zeroable};
 
 #[cfg(not(feature = "solana"))]
-use sha3::Digest;
+use blake3::Hasher;
 
 pub const HASH_BYTES: usize = 32;
 
@@ -88,14 +88,14 @@ impl Leaf {
 #[cfg(feature = "solana")]
 #[inline(always)]
 pub fn hashv(data: &[&[u8]]) -> Hash {
-    let res = solana_program::keccak::hashv(data);
+    let res = solana_program::hash::hashv(data);
     Hash::new_from_array(res.to_bytes())
 }
 
 #[cfg(not(feature = "solana"))]
 #[inline(always)]
 pub fn hashv(data: &[&[u8]]) -> Hash {
-    let mut hasher = sha3::Keccak256::new();
+    let mut hasher = blake3::Hasher::new();
     for d in data {
         hasher.update(d);
     }
@@ -105,14 +105,14 @@ pub fn hashv(data: &[&[u8]]) -> Hash {
 #[cfg(feature = "solana")]
 #[inline(always)]
 pub fn hash(data: &[u8]) -> Hash {
-    let res = solana_program::keccak::hash(data);
+    let res = solana_program::hash::hash(data);
     Hash::new_from_array(res.to_bytes())
 }
 
 #[cfg(not(feature = "solana"))]
 #[inline(always)]
 pub fn hash(data: &[u8]) -> Hash {
-    let mut hasher = sha3::Keccak256::new();
+    let mut hasher = blake3::Hasher::new();
     hasher.update(data);
     Hash::new_from_array(hasher.finalize().into())
 }
