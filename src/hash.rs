@@ -1,8 +1,5 @@
 use bytemuck::{Pod, Zeroable};
 
-#[cfg(not(feature = "solana"))]
-use blake3::Hasher;
-
 pub const HASH_BYTES: usize = 32;
 
 #[repr(C)]
