@@ -1,6 +1,6 @@
 [package]
 name = "brine-tree"
-version = "0.5.4"
+version = "0.6.0"
 edition = "2021"
 description = "Merkle tree implementation for Solana programs"
 license = "MIT"
@@ -16,7 +16,15 @@ sha3 = "0.10.8"
 bytemuck = { version = "1.18.0", features = ["derive"] }
 solana-program = { version = ">=1.18.0", optional = true }
 
+[dev-dependencies]
+criterion = "0.5"
+rand = "0.8"
+
 [features]
 default = ["std"]
 std = []
 solana = ["solana-program"]
+
+[[bench]]
+name = "merkle_proof"
+harness = false
