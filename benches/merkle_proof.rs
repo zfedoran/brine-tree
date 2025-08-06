@@ -65,7 +65,7 @@ pub fn merkle_proof_bench(c: &mut Criterion) {
                     &tree,
                     black_box(leaf_index),
                     SPLIT_LAYER,
-                    &fetch_leaf,
+                    fetch_leaf,
                     &cached_layer_nodes,
                 );
                 debug_assert!(verify(tree.get_root(), &proof, leaves_prefix[leaf_index]));

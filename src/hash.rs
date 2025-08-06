@@ -29,7 +29,7 @@ impl From<[u8; HASH_BYTES]> for Hash {
 
 impl From<[u8; HASH_BYTES]> for Leaf {
     fn from(from: [u8; 32]) -> Self {
-        Self { 0: Hash { value: from } }
+        Self(Hash { value: from })
     }
 }
 

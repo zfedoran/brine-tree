@@ -230,7 +230,7 @@ impl<const N: usize> MerkleTree<N> {
             if current_layer.is_empty() {
                 break;
             }
-            let mut next_layer = Vec::with_capacity((current_layer.len() + 1) / 2);
+            let mut next_layer = Vec::with_capacity(current_layer.len().div_ceil(2));
             let mut i = 0;
             while i < current_layer.len() {
                 if i + 1 < current_layer.len() {
@@ -466,7 +466,7 @@ mod tests {
         let seeds: &[&[u8]] = &[b"test"];
 
         let mut tree = TestTree::new(seeds);
-        let empty = tree.zero_values.first().unwrap().clone();
+        let empty = *tree.zero_values.first().unwrap();
         let empty_leaf = empty.as_leaf();
 
         // Tree structure:
@@ -483,11 +483,11 @@ mod tests {
         let b = Hash::from(Leaf::new(&[b"val_2"]));
         let c = Hash::from(Leaf::new(&[b"val_3"]));
 
-        let d = empty.clone();
-        let e = empty.clone();
-        let f = empty.clone();
-        let g = empty.clone();
-        let h = empty.clone();
+        let d = empty;
+        let e = empty;
+        let f = empty;
+        let g = empty;
+        let h = empty;
 
         let i = hash_left_right(a, b);
         let j: Hash = hash_left_right(c, d);
@@ -511,9 +511,9 @@ mod tests {
         assert_eq!(tree.filled_subtrees[2], m);
         assert_eq!(root, tree.get_root());
 
-        let val1_proof = vec![b.clone(), j.clone(), n.clone()];
-        let val2_proof = vec![a.clone(), j.clone(), n.clone()];
-        let val3_proof = vec![d.clone(), i.clone(), n.clone()];
+        let val1_proof = vec![b, j, n];
+        let val2_proof = vec![a, j, n];
+        let val3_proof = vec![d, i, n];
 
         // Check filled leaves
         assert!(tree.contains(&val1_proof, &[b"val_1"]));
@@ -521,11 +521,11 @@ mod tests {
         assert!(tree.contains(&val3_proof, &[b"val_3"]));
 
         // Check empty leaves
-        assert!(tree.contains_leaf(&vec![c.clone(), i.clone(), n.clone()], empty_leaf));
-        assert!(tree.contains_leaf(&vec![f.clone(), l.clone(), m.clone()], empty_leaf));
-        assert!(tree.contains_leaf(&vec![e.clone(), l.clone(), m.clone()], empty_leaf));
-        assert!(tree.contains_leaf(&vec![h.clone(), k.clone(), m.clone()], empty_leaf));
-        assert!(tree.contains_leaf(&vec![g.clone(), k.clone(), m.clone()], empty_leaf));
+        assert!(tree.contains_leaf(&[c, i, n], empty_leaf));
+        assert!(tree.contains_leaf(&[f, l, m], empty_leaf));
+        assert!(tree.contains_leaf(&[e, l, m], empty_leaf));
+        assert!(tree.contains_leaf(&[h, k, m], empty_leaf));
+        assert!(tree.contains_leaf(&[g, k, m], empty_leaf));
 
         // Remove val2 from the tree
         assert!(tree.try_remove(&val2_proof, &[b"val_2"]).is_ok());
@@ -537,8 +537,8 @@ mod tests {
 
         assert_eq!(root, tree.get_root());
 
-        let val1_proof = vec![empty.clone(), j.clone(), n.clone()];
-        let val3_proof = vec![d.clone(), i.clone(), n.clone()];
+        let val1_proof = vec![empty, j, n];
+        let val3_proof = vec![d, i, n];
 
         assert!(tree.contains_leaf(&val1_proof, Leaf::new(&[b"val_1"])));
         assert!(tree.contains_leaf(&val2_proof, empty_leaf));
@@ -588,7 +588,7 @@ mod tests {
         let invalid_proof_short = &val1_proof[..2]; // Shorter than depth
         let invalid_proof_long = [&val1_proof[..], &val1_proof[..]].concat(); // Longer than depth
 
-        assert!(!tree.contains(&invalid_proof_short, &[b"val_1"]));
+        assert!(!tree.contains(invalid_proof_short, &[b"val_1"]));
         assert!(!tree.contains(&invalid_proof_long, &[b"val_1"]));
 
         // Empty Proof
