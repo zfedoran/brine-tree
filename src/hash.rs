@@ -85,7 +85,7 @@ impl Leaf {
 #[cfg(feature = "solana")]
 #[inline(always)]
 pub fn hashv(data: &[&[u8]]) -> Hash {
-    let res = solana_program::hash::hashv(data);
+    let res = solana_program::blake3::hashv(data);
     Hash::new_from_array(res.to_bytes())
 }
 
@@ -102,7 +102,7 @@ pub fn hashv(data: &[&[u8]]) -> Hash {
 #[cfg(feature = "solana")]
 #[inline(always)]
 pub fn hash(data: &[u8]) -> Hash {
-    let res = solana_program::hash::hash(data);
+    let res = solana_program::blake3::hash(data);
     Hash::new_from_array(res.to_bytes())
 }
 

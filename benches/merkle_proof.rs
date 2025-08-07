@@ -6,7 +6,7 @@ use brine_tree::{
     Hash, 
     verify, 
     get_merkle_proof, 
-    get_split_merkle_proof,
+    get_cached_merkle_proof,
 };
 
 const TREE_HEIGHT: usize = 18;
@@ -43,7 +43,6 @@ pub fn merkle_proof_bench(c: &mut Criterion) {
                     black_box(leaf_index),
                     TREE_HEIGHT,
                 );
-                // Optional: verify to ensure same behavior as split version
                 debug_assert!(verify(tree.get_root(), &proof, leaves_prefix[leaf_index]));
                 black_box(proof);
             },
@@ -61,12 +60,12 @@ pub fn merkle_proof_bench(c: &mut Criterion) {
         b.iter_batched(
             || indices[rng.gen_range(0..indices.len())],
             |leaf_index| {
-                let proof = get_split_merkle_proof(
+                let proof = get_cached_merkle_proof(
                     &tree,
                     black_box(leaf_index),
                     SPLIT_LAYER,
-                    fetch_leaf,
                     &cached_layer_nodes,
+                    fetch_leaf,
                 );
                 debug_assert!(verify(tree.get_root(), &proof, leaves_prefix[leaf_index]));
                 black_box(proof);

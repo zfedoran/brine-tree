@@ -3,23 +3,22 @@
 ![license](https://img.shields.io/badge/license-MIT-blue.svg?style=flat)
 [![crates.io](https://img.shields.io/crates/v/brine-tree.svg?style=flat)](https://crates.io/crates/brine-tree)
 
-A fast, low-overhead, Merkle tree library for the Solana programs.
-
-![image](https://github.com/user-attachments/assets/6c34a34b-644f-4248-bf78-d7c43d1e18f6)
-
+A fast, low-overhead, **Blake3** Merkle tree library for the Solana programs.
 
 ---
 
-## ✨ Features
+## Features
 
+- Zero-copy
 - Support for add, remove, replace
 - Low compute unit (CU) consumption
 - Can be stored in account state
-- Zero-copy
+- Includes proof generation and verification
+- Includes cached proof generation
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ```rust
 use brine_tree::{MerkleTree, Leaf};
@@ -50,7 +49,7 @@ Returns `Ok(())` for successful operations or `Err(ProgramError)` if invalid.
 
 ---
 
-## 🧱 Use Cases
+## Use Cases
 
 - State compression for large datasets
 - Whitelist or access control verification
@@ -71,7 +70,7 @@ Returns `Ok(())` for successful operations or `Err(ProgramError)` if invalid.
 
 ---
 
-## 🙌 Contributing
+## Contributing
 
 Contributions are welcome! Please open issues or PRs on the GitHub repo.
 

@@ -1,11 +1,11 @@
 use super::{
     error::{BrineTreeError, ProgramResult},
     hash::{hashv, Hash, Leaf},
-    utils::{check_condition, descendant_range, find_ancestor},
+    utils::check_condition,
 };
 use bytemuck::{Pod, Zeroable};
 
-#[repr(C, align(8))]
+#[repr(C)]
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub struct MerkleTree<const N: usize> {
     pub root: Hash,
@@ -206,7 +206,8 @@ impl<const N: usize> MerkleTree<N> {
         get_merkle_proof(leaves, &self.zero_values, leaf_index, N)
     }
 
-    /// Returns the nodes at a specific layer of the Merkle tree.
+    /// Hashes up to `layer_number` and returns only the non-empty nodes
+    /// on that layer.
     pub fn get_layer_nodes(&self, leaves: &[Leaf], layer_number: usize) -> Vec<Hash> {
         if layer_number > N {
             return vec![];
@@ -289,89 +290,6 @@ pub fn get_merkle_proof(
         layer_index += 1;
     }
 
-    proof
-}
-
-/// Build a Merkle proof for `leaf_index` by splitting the work at `layer_number`.
-/// - `cached_layer_nodes` are the *materialized* nodes at `layer_number`,
-///   in **contiguous left-to-right order**, with no zero nodes included.
-/// - `fetch_leaf(global_leaf_index)` returns `Some(Leaf)` if present, else `None`.
-///
-/// Requirements:
-/// - Layers are numbered: leaves = 0, root = N.
-/// - `cached_layer_nodes` must cover the target node's position in that layer.
-/// - Tree is prefix-filled (left to right), so cached layer nodes form a prefix.
-///
-/// Returns a full-length proof of size `N`.
-pub fn get_split_merkle_proof<const N: usize>(
-    tree: &MerkleTree<N>,
-    leaf_index: usize,
-    layer_number: usize,
-    fetch_leaf: impl Fn(usize) -> Option<Leaf>,
-    cached_layer_nodes: &[Hash],
-) -> Vec<Hash> {
-    assert!(layer_number <= N, "layer_number exceeds tree height");
-    assert!(leaf_index < (1usize << N), "leaf_index out of capacity");
-    assert!(
-        !cached_layer_nodes.is_empty(),
-        "cached_layer_nodes must not be empty"
-    );
-
-    let height = N;
-
-    // First global index at a given layer (leaves = 0).
-    let first_index_in_layer = |layer: usize| -> usize {
-        if layer == 0 {
-            0
-        } else {
-            (1usize << (height + 1)) - (1usize << (height + 1 - layer))
-        }
-    };
-
-    // Split point: ancestor of the target at `layer_number`
-    let subtree_node_index = find_ancestor(layer_number, leaf_index, height);
-    let pos_in_layer = subtree_node_index - first_index_in_layer(layer_number);
-    assert!(
-        pos_in_layer < cached_layer_nodes.len(),
-        "cached layer does not include the target node (pos_in_layer = {pos_in_layer})"
-    );
-
-    // Lower subtree (from leaf up to `layer_number`)
-    let (leaf_start, leaf_count) = descendant_range(subtree_node_index, 0, height);
-    let zero_leaf = tree.zero_values[0].as_leaf();
-
-    let mut lower_leaves: Vec<Leaf> = Vec::with_capacity(leaf_count);
-    for i in 0..leaf_count {
-        let g = leaf_start + i;
-        lower_leaves.push(fetch_leaf(g).unwrap_or(zero_leaf));
-    }
-    let subtree_leaf_index = leaf_index - leaf_start;
-
-    // Proof from leaf up `layer_number` steps
-    let lower_proof = get_merkle_proof(
-        &lower_leaves,
-        &tree.zero_values, // zeroes aligned from the real layer 0
-        subtree_leaf_index,
-        layer_number,
-    );
-
-    // Upper tree (from cached layer up to root)
-    // Treat cached layer nodes as "leaves" at level 0 of the upper tree.
-    let upper_height = height - layer_number;
-    let upper_leaves_as_leaf: Vec<Leaf> = cached_layer_nodes.iter().map(|h| h.as_leaf()).collect();
-
-    // Align zeroes so level 0 here corresponds to real `layer_number`
-    let upper_proof = get_merkle_proof(
-        &upper_leaves_as_leaf,
-        &tree.zero_values[layer_number..],
-        pos_in_layer,
-        upper_height,
-    );
-
-    let mut proof = Vec::with_capacity(height);
-    proof.extend(lower_proof);
-    proof.extend(upper_proof);
-    debug_assert_eq!(proof.len(), height);
     proof
 }
 
@@ -687,52 +605,6 @@ mod tests {
 
         // Verify proof (generic)
         assert!(verify(a, &b, c));
-    }
-
-    #[test]
-    fn test_get_proof_from_subtree() {
-        const N: usize = 5; // height (32 leaves capacity)
-        let layer_number = 2;
-        let leaf_index = 4usize;
-
-        let seeds: &[&[u8]] = &[b"test"];
-        let mut tree = MerkleTree::<N>::new(seeds);
-
-        // Populate first 5 leaves (prefix-filled)
-        for i in 0..=4 {
-            assert!(tree.try_add(&[format!("val_{}", i + 1).as_bytes()]).is_ok());
-        }
-
-        // Build a tiny "DB" for leaves
-        let mut leaves_db = std::collections::HashMap::new();
-        for i in 0..=4 {
-            leaves_db.insert(i, Leaf::new(&[format!("val_{}", i + 1).as_bytes()]));
-        }
-        let fetch_leaf = |idx: usize| leaves_db.get(&idx).copied();
-
-        // Precompute the cached layer nodes (no zero nodes stored)
-        let contiguous_leaves: Vec<Leaf> = (0..=4).map(|i| fetch_leaf(i).unwrap()).collect();
-        let cached_layer_nodes = tree.get_layer_nodes(&contiguous_leaves, layer_number);
-        assert!(!cached_layer_nodes.is_empty());
-
-        // Split proof
-        let split = get_split_merkle_proof(
-            &tree,
-            leaf_index,
-            layer_number,
-            fetch_leaf,
-            &cached_layer_nodes,
-        );
-
-        // Baseline proof using the full set (get_merkle_proof pads internally)
-        let baseline = get_merkle_proof(&contiguous_leaves, &tree.zero_values, leaf_index, N);
-
-        assert_eq!(split, baseline, "split proof must equal baseline proof");
-        assert!(verify(
-            tree.get_root(),
-            &split,
-            fetch_leaf(leaf_index).unwrap()
-        ));
     }
 
     #[test]
