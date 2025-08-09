@@ -29,6 +29,15 @@ impl<const N: usize> MerkleTree<N> {
         }
     }
 
+    pub fn from_seeds(zeros: [Hash; N]) -> Self {
+        Self {
+            next_index: 0,
+            root: zeros[N - 1],
+            filled_subtrees: zeros,
+            zero_values: zeros,
+        }
+    }
+
     pub const fn get_depth(&self) -> u8 {
         N as u8
     }
