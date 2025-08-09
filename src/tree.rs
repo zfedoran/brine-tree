@@ -29,7 +29,7 @@ impl<const N: usize> MerkleTree<N> {
         }
     }
 
-    pub fn from_seeds(zeros: [Hash; N]) -> Self {
+    pub fn from_zeros(zeros: [Hash; N]) -> Self {
         Self {
             next_index: 0,
             root: zeros[N - 1],
